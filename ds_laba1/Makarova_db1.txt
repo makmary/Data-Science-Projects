@@ -1,0 +1,99 @@
+-- A. Report about income from sales by product, client and sales person. Please mind discounts.
+--      Also mind that for some combinations of values in these dimensions  there are no sales at all, so create
+--      two versions of queries with and without zero values.
+-----------
+-- CUBE(X,Y,Z) will create grouping sets like this: (X,Y,Z),(  ,Y,Z),(X,Y, ),(X, ,Y),(X),(Y),(Z),()
+
+SELECT Customer.CustomerID AS CustomerID,
+       Product.Name AS Product,
+       Customer.SalesPerson,
+       sum(Product.ListPrice) AS Price  -- here discounts are taken into consideration
+FROM SalesLT.SalesOrderDetail JOIN SalesLT.Product ON SalesOrderDetail.ProductID = Product.ProductID
+                                JOIN SalesLT.SalesOrderHeader ON SalesOrderDetail.SalesOrderID = SalesOrderHeader.SalesOrderID
+                                JOIN SalesLT.Customer ON SalesOrderHeader.CustomerID = Customer.CustomerID
+GROUP BY
+    CUBE(Customer.CustomerID, Product.Name, Customer.SalesPerson);
+-- ORDER BY Customer.CustomerID;
+
+------------
+SELECT Customer.CustomerID,
+       Product.Name AS Product,
+       Customer.SalesPerson,
+       sum(Product.ListPrice) as Price
+FROM SalesLT.SalesOrderDetail JOIN SalesLT.SalesOrderHeader  ON SalesOrderDetail.SalesOrderID = SalesOrderHeader.SalesOrderID
+                         RIGHT OUTER JOIN SalesLT.Product ON SalesOrderDetail.ProductID = Product.ProductID
+                               JOIN SalesLT.Customer ON SalesOrderHeader.CustomerID = Customer.CustomerID
+GROUP BY
+    CUBE(Customer.CustomerID, Product.Name, Customer.SalesPerson);
+-- ORDER BY Customer.CustomerID;
+
+-- B. Report about income from sales by product, client and (country (region) for billing, shipping and client residency)
+--      as they can be different. Is it case according our data? But you should generalize in any case. Please mind discounts.
+--      You should include in that report only data that supported by sales (so no zero entries except discounted price is zero).
+
+SELECT Address.CountryRegion AS Region,
+       SalesOrderHeader.BillToAddressID AS Billing,
+       SalesOrderHeader.ShipToAddressID AS Shipping,
+       Product.Name AS Product,
+       Customer.CustomerID,
+       sum(SalesOrderDetail.LineTotal) as Price
+FROM SalesLT.SalesOrderDetail JOIN SalesLT.SalesOrderHeader ON SalesOrderDetail.SalesOrderID = SalesOrderHeader.SalesOrderID
+                               JOIN SalesLT.Product ON SalesOrderDetail.ProductID = Product.ProductID
+                               JOIN SalesLT.Customer ON SalesOrderHeader.CustomerID = Customer.CustomerID
+                               JOIN SalesLT.Address ON SalesOrderHeader.ShipToAddressID = Address.AddressID
+GROUP BY
+ GROUPING SETS (Address.CountryRegion, SalesOrderHeader.BillToAddressID, SalesOrderHeader.ShipToAddressID, ROLLUP(Customer.CustomerID, Product.Name));
+
+--     CUBE(Customer.CustomerID, Product.Name,
+---add two columns
+-- C. Report about income from sales and provided discounts by location in form of hierarchy city>state/province>country/region.
+-- In that report you can rely on unique geographical names, but in general it is not the case. Think about how to solve that task
+-- in case that there is a possibility of existence of multiple cities in the same province with the same name.
+
+SELECT Address.City AS City,
+       Address.StateProvince AS State_Province,
+       Address.CountryRegion AS Country_Region,
+       sum(SalesOrderDetail.LineTotal) as Income,
+       sum(SalesOrderDetail.UnitPriceDiscount * SalesOrderDetail.UnitPrice * SalesOrderDetail.OrderQty) as ProvidedDiscount,
+        sum(SalesOrderDetail.UnitPriceDiscount * SalesOrderDetail.UnitPrice) as ProvidedDiscountForOneItem
+FROM SalesLT.SalesOrderHeader JOIN SalesLT.Address ON SalesOrderHeader.ShipToAddressID = Address.AddressID
+                              JOIN SalesLT.SalesOrderDetail ON SalesOrderHeader.SalesOrderID = SalesOrderDetail.SalesOrderID
+GROUP BY
+    ROLLUP(Address.CountryRegion, Address.StateProvince, Address.City);
+
+-- D. Report about income from sales and provided discounts by product and hierarchy of product categories
+-- (high level category-> next level category->...->low level category->product). Please mind that some products can be
+-- outside (any) category or be only partially categorized (be not in low level of hierarchy). You can rely on you data
+-- to solve to solve this task (especially on that how much subcategories in the current data set), but try to think how
+-- to solve this task in general (with arbitrary category tree).
+
+SELECT ParentProductCategory.Name as HighLevelCategory,
+       ProductCategory.Name as LowLevelCategory,
+       Product.Name as ProductName,
+       sum(Product.ListPrice) as Cost,
+       sum(SalesOrderDetail.UnitPriceDiscount * SalesOrderDetail.UnitPrice * SalesOrderDetail.OrderQty) as ProvidedDiscount
+FROM SalesLT.ProductCategory ProductCategory JOIN SalesLT.ProductCategory ParentProductCategory ON ProductCategory.ParentProductCategoryID = ParentProductCategory.ProductCategoryID
+                                JOIN SalesLT.Product Product ON ProductCategory.ProductCategoryID = Product.ProductCategoryID
+                                JOIN SalesLT.SalesOrderDetail SalesOrderDetail ON Product.ProductID = SalesOrderDetail.ProductID
+GROUP BY ROLLUP(ParentProductCategory.Name, ProductCategory.Name), Product.Name;
+
+
+-- E. Create integral report on number of product sales by product, client, sales person and hierarchy of regions.
+
+SELECT Product.Name,
+       Customer.CustomerID,
+       Customer.SalesPerson,
+       Address.CountryRegion,
+       Address.StateProvince,
+       Address.City,
+       sum(SalesOrderDetail.LineTotal) as MoneyReport
+FROM SalesLT.SalesOrderDetail JOIN SalesLT.SalesOrderHeader ON SalesOrderDetail.SalesOrderID = SalesOrderHeader.SalesOrderID
+                                 JOIN SalesLT.Customer ON SalesOrderHeader.CustomerID = Customer.CustomerID
+                                 JOIN SalesLT.Product ON SalesOrderDetail.ProductID = Product.ProductID
+                                 JOIN SalesLT.Address ON SalesOrderHeader.ShipToAddressID = Address.AddressID
+GROUP BY
+    GROUPING SETS(Product.Name, Customer.CustomerID, Customer.SalesPerson,
+                       ROLLUP(Address.CountryRegion, Address.StateProvince, Address.City));
+
+
+

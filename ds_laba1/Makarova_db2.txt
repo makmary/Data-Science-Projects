@@ -1,0 +1,87 @@
+
+--------------------------------------------------------------------------------------------------------------------------------
+-----SECOND PART
+
+-- 1. Create reports about ranking for sales persons:
+-- A. Rank your sales persons by number of clients, report should include rank, sales person id
+-- and client number in descending order.
+
+SELECT SalesPerson,
+       count(CustomerID) as Quantity_Customers,
+       RANK() OVER (ORDER BY count(CustomerID) DESC) AS Rank
+FROM SalesLT.Customer
+        GROUP BY SalesPerson
+        ORDER BY Quantity_Customers DESC;
+
+-- B. Rank your sales persons by number of sales, your report should include all sales persons with id,
+-- dense rank and number of sales in descending order.
+
+SELECT SalesPerson,
+       count(OrderQty) as Number_Of_Sales,
+    DENSE_RANK() over (ORDER BY count(OrderQty) DESC) as Rank
+FROM SalesLT.Customer FULL OUTER JOIN SalesLT.SalesOrderHeader ON Customer.CustomerID = SalesOrderHeader.CustomerID
+                    FULL OUTER JOIN SalesLT.SalesOrderDetail ON SalesOrderDetail.SalesOrderID = SalesOrderHeader.SalesOrderID
+       GROUP BY SalesPerson
+       ORDER BY Number_Of_Sales DESC;
+
+
+
+--  продавцы с 0 продаж
+
+-- C. Rank your sales person by income from sales, your report should include all sales persons with id,
+-- rank and income in descending order.
+
+SELECT SalesPerson,
+       sum(LineTotal) as Income,
+       RANK() over (ORDER BY sum(LineTotal) DESC) as Rank
+FROM SalesLT.Customer Customer FULL OUTER JOIN SalesLT.SalesOrderHeader SalesOrderHeader ON Customer.CustomerID = SalesOrderHeader.CustomerID
+                        FULL OUTER JOIN SalesLT.SalesOrderDetail SalesOrderDetail ON SalesOrderHeader.SalesOrderID = SalesOrderDetail.SalesOrderID
+    GROUP BY SalesPerson;
+
+--  продавцы с 0 продаж
+-- A. Rank regions / states in the country by number of customers (use main office address), your report should include country,
+-- state or region, number of customers and percent rank ordered by country (alphabetically) and number of clients (descending).
+-- In case of equality in client numbers order region or states alphabetically.
+
+SELECT CountryRegion AS Country,
+       StateProvince AS State_Region,
+       COUNT(CustomerID) AS Number_Of_Customers,
+       PERCENT_RANK() OVER (PARTITION BY CountryRegion ORDER BY COUNT(CustomerAddress.CustomerID)) AS RankPercent
+                FROM SalesLT.CustomerAddress JOIN SalesLT.Address ON CustomerAddress.AddressID = Address.AddressID
+                WHERE CustomerAddress.AddressType = 'Main Office'
+       GROUP BY CountryRegion, StateProvince
+       ORDER BY CountryRegion ASC, Number_Of_Customers DESC, StateProvince ASC;
+
+
+-- B. Include in previous report customers without information about address. Use dense rank instead of percent rank in that report
+SELECT CountryRegion AS Country,
+       StateProvince AS State_Region,
+       count(CustomerID) AS Number_Of_Customers,
+       DENSE_RANK() OVER (PARTITION BY CountryRegion ORDER BY COUNT(CustomerAddress.CustomerID)) AS DenseRank
+                FROM SalesLT.CustomerAddress JOIN SalesLT.Address ON CustomerAddress.AddressID = Address.AddressID
+                WHERE CustomerAddress.AddressType = 'Main Office'
+       GROUP BY CountryRegion, StateProvince
+
+UNION ALL
+
+SELECT NULL, NULL, count(CustomerID) as Number_Of_Customers, DENSE_RANK() OVER(ORDER BY COUNT(Customer.CustomerID)) AS DenseRank
+FROM SalesLT.Customer;
+
+-- C. Rank cities in the country by number of customers (use main office address), your report should include country,
+-- state or region, city,  number of clients, rank (use plane rank here) and difference in number of client with
+-- previous position in by country ranking (for first position should be null). Order your report by country name
+-- (alphabetically), number of clients (descending) and city name (alphabetically).
+
+with a as (
+    SELECT CountryRegion, StateProvince, City, COUNT(CustomerID) AS Number_of_Clients,
+                    RANK() OVER (ORDER BY COUNT(CustomerID) DESC) AS RankQtyCl
+                    FROM SalesLT.Address JOIN SalesLT.CustomerAddress ON Address.AddressID = CustomerAddress.AddressID
+                                                                        WHERE CustomerAddress.AddressType = 'Main Office'
+                    GROUP BY Address.CountryRegion, Address.StateProvince, Address.City
+) select CountryRegion as Counrty,
+       StateProvince as State_Region,
+       City as City,
+       Number_of_Clients,
+       RankQtyCl,
+        ABS(Number_of_Clients - LAG(Number_of_Clients) OVER (PARTITION BY CountryRegion ORDER BY CountryRegion, Number_of_Clients DESC, City)) AS Difference_In_Number
+            from a;

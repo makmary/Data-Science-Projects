@@ -1,0 +1,199 @@
+---
+title: "K-means Laba"
+author: "Makarova M."
+date: "11/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## K-means
+
+(K-means)  You have been asked to cluster all 50 U.S. states, including Washington D.C. and Puerto Rico, by mean household income and mean household electricity usage (both rounded by the integer).  You have decided to use a k-means clustering algorithm.
+
+## Loading useful packages
+
+```{r useful libraries for this project}
+library(ggplot2)
+library(maps)
+library(DBI)
+```
+
+```{r loading data from Rdata file}
+load("/cloud/project/income_elec_state.Rdata", verbose=TRUE)
+str(income_elec_state)
+data <- income_elec_state
+```
+```{r plot from data}
+  ggplot(data, aes(income, elec)) + geom_point()
+```
+
+
+## Possible Clustering
+
+a.      Cluster the data and plot all 52 data points, along with the centroids.  Mark all data points and centroids belonging to a given cluster with their own color.  Here, let k=10.
+
+b.      Repeat step (a) several times.  What can change each time you cluster the data?  Why?  How do you prevent these changes from occurring?
+
+kmeans(x, centers) - perform k-means clustering on a data matrix
+
+* x - numeric matrix of data, or an object that can be coerced to such a matrix;
+
+* centers - the number of clusters, say k, or a set of initial cluster centers.
+
+* nstart - if centers is a number, how many random sets should be chosen
+
+* iter.max - the maximum number of iterations allowed.
+
+kmeans returns an object of class "kmeans" which has a print and a fitted method. 
+
+* cluster - a vector of integers(from 1:k) indicating the cluster to which each point is allocated
+
+* centers - a matrix of cluster centres
+
+```{r showing the clasters}
+  new_cluster <- kmeans(data, 10)
+  plot(data, col=new_cluster$cluster)
+  points(new_cluster$centers, col=1:10, pch=8)
+```
+
+## K Determination
+
+Determine a reasonable value of k.
+
+A plot of the within groups sum of squares by number of clusters extracted can help determine the appropriate number of clusters.
+
+* WSS - within-cluster sum of square;
+
+* withinss - vector of within-cluster sum of squares, one component per cluster.
+
+```{r wss plot for k-means clustering 1}
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:10) wss[i] <- sum(kmeans(data, centers=i)$withinss)
+  plot(1:10, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+```{r wss plot for k-means clustering 1 with scale_data}
+  scale_data <- scale(data)  
+  wss <- (nrow(scale_data)-1)*sum(apply(scale_data,2,var))
+  for (i in 2:10) wss[i] <- sum(kmeans(scale_data, centers=i)$withinss)
+  plot(1:10, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+```{r plot clusters 1}
+  new_cluster <- kmeans(data, 4)
+  plot(data, col=new_cluster$cluster)
+  points(new_cluster$centers, col=1:10, pch=8)
+```    
+
+## Scale
+
+Convert the mean household income and mean electricity usage to a log10 scale and cluster this transformed dataset.
+
+```{r convert data to a log10 scale}
+  data_log <- data
+  data_log$income = log10(data$income)
+  data_log$elec = log10(data$elec)
+```
+
+```{r plot cluster from data_log}
+  clusterlog <- kmeans(data_log, 4)
+  plot(data_log, col=clusterlog$cluster)
+  points(clusterlog$centers, col=1:10, pch=8)
+```
+
+## K Reevaluation
+
+Reevaluate your choice of k. Would you now choose k differently?
+
+```{r wss plot for k-means clustering 2}
+  wss <- (nrow(data_log)-1)*sum(apply(data_log,2,var))
+  for (i in 2:10) wss[i] <- sum(kmeans(data_log,centers=i)$withinss)
+  plot(1:10, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+## K Reevaluation II
+
+Have you observed an outlier in the data? Remove the outlier and, once again, reevaluate your choice of k.
+
+
+```{r find outliers}
+  ggplot(data, aes(income, elec)) + geom_point()
+  data_rem <- data[data$income > 30000,]
+  ggplot(data_rem, aes(income, elec)) + geom_point()
+```
+```{r plot cluster from data_rem}
+  clusterrem <- kmeans(data_rem, 4)
+  plot(data_rem, col=clusterrem$cluster)
+  points(clusterrem$centers, col=1:10, pch=8)
+```
+
+
+```{r wss plot for k-means clustering 3}
+  wss <- (nrow(data_rem)-1)*sum(apply(data_rem,2,var))
+  for (i in 2:15) wss[i] <- sum(kmeans(data_rem,centers=i)$withinss)
+  plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+## Maps and Code
+
+Proper map coloring
+
+```{r map coloring}
+map_order <- c('AL', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 
+'GA', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 
+'MD', 'MA', 'MA', 'MA', 'MI', 'MI', 'MN', 'MS', 'MO', 
+'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NY', 'NY', 
+'NY', 'NC', 'NC', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 
+'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'VA', 
+'VA', 'WA', 'WA', 'WA', 'WA', 'WA', 'WV', 'WI', 'WY')
+
+clust <- kmeans(data_rem, 4)
+
+map_color <- clust$cluster[map_order]
+map('state', fill=TRUE,col = map_color)
+```
+
+
+## Hierarchical clustering using Complete Linkage
+
+dist - creates matrix of distances
+
+An object of class hclust which describes the tree produced by the clustering process.
+
+* method = This must be one of "euclidean", "maximum", "manhattan", "canberra", "binary" or "minkowski". Any unambiguous substring can be given.
+
+```{r}
+d <- dist(data_rem, method = "euclidean") 
+dendogram <- hclust(d, method="complete")
+plot(dendogram)
+
+groups <- cutree(dendogram, k=4)
+rect.hclust(dendogram, k=4, border="red")
+```
+
+## Hierarchical clustering using Single Linkage
+
+```{r}
+d <- dist(data_rem, method = "euclidean") 
+dendogram <- hclust(d, method="single")
+plot(dendogram)
+```
+
+## Hierarchical clustering using Average Linkage
+
+```{r}
+d <- dist(data_rem, method = "euclidean") 
+dendogram <- hclust(d, method="average")
+plot(dendogram)
+```
+
+## Hierarchical clustering using Centroid Linkage
+
+```{r}
+d <- dist(data_rem, method = "euclidean") 
+dendogram <- hclust(d, method="centroid")
+plot(dendogram)
+```

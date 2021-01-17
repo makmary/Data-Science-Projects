@@ -1,0 +1,152 @@
+---
+title: "Makarova_labaR"
+author: "Makarova Mariia"
+date: "04 11 2020"
+output: html_document
+runtime: shiny
+params:
+  n: 32038
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
+
+## Load data
+
+Loading data from file named zipIncome.txt
+
+  * sep - the field separator character
+  * header - a logical value indicating whether the file contains the names of the variables as its first line.
+  * nrows - integer: the maximum number of rows to read in.
+  
+  x <- 1
+
+  x <- c(1, 2)
+  
+rbind
+  
+ 1 2 3
+
+ 4 5 6 
+
+ 7 8 9
+   
+cbind   
+   
+ 1 4 7 
+
+ 2 5 8
+
+ 3 6 9
+   
+```{r loading data}
+table <- read.table('/cloud/project/zipIncome.txt', sep='|', header=TRUE)
+```
+
+  A variable "table" is a data frame.
+
+```{r checking class}
+class(table)
+```
+
+```{r, echo=FALSE, fig.align='center'}
+numericInput("n", "How many first rows to show?", 5)
+renderTable({
+  head(table, input$n)
+})
+```
+
+## Renaming columns
+
+Changing the column names of our data frame so that zip_Prefix becomes zipCode and meanhouseholdincome becomes income.
+
+```{r renaming columns}
+colnames(table)[1] <- "zipCode"
+colnames(table)[2] <- "income"
+```
+
+## Mean and Median Average Incomes
+
+Analyzing the summary of our data. Here we can see the mean and median average incomes.
+Summary() provides the minimum, maximum, median, mean and the 1st and 3rd quartile values.
+
+```{r showing summary}
+summary(table)
+mean(table$income, na.rm=TRUE)
+median(table$income, na.rm=TRUE)
+```
+## Plotting a scatter plot of the data
+
+```{r plotting a scatter plot of the data}
+plot(table)
+```
+
+## Filtering the data
+
+In order to omit outliers, we create a subset of the data so that: $7,000 < income < $200,000
+
+```{r filtering the data}
+filtered_data <- table[table$income >= 7000 & table$income <= 200000,]
+summary(filtered_data)
+mean(filtered_data$income, na.rm=TRUE)
+```
+## Simple Boxplot (Box and Whisker Plot)
+
+In the box plot you created, notice that all of the income data is pushed towards the bottom of the graph because most average incomes tend to be low.
+* str(x) - internal structure of object x .
+* We can generate factor levels by using the gl() function.
+
+```{r creating simple boxplot}
+str(filtered_data)
+
+boxplot(income~as.factor(zipCode), 
+        data=filtered_data,
+        main = "Average Household Income by Zip Code",
+        xlab = "Zip Codes",
+        ylab = "Income"
+)
+```
+
+Create a new box plot where the y-axis uses a log scale.  Be sure to add a title and label the axes
+log parameter in boxplot function for y-axis 
+
+```{r creatng a new simple boxplot}
+boxplot(income~as.factor(zipCode), 
+        data=filtered_data,
+        main = "Average Household Income by Zip Code",
+        xlab = "Zip Codes",
+        ylab = "Income",
+        log= 'y'
+)
+```
+
+ Make a ggplot that consists of just a scatter plot (диаграмма рассеяния) using the function geom_point() with position = “jitter”  so that the data points are grouped by zip code.  Be sure to use ggplot’s function for taking the log10 of the y-axis data.  (Hint: for geom_point, have alpha=0.2).
+ 
+ * data - ggplot builds a plot by using this data
+ * aes - begins a plot that you finish by adding layers to. Add one geom function per layer
+ * geom_point - geom points all over the plot
+ 
+ Position adjustments - position adjustments determine how to arrange geoms that would otherwise occupy the same space.
+ 
+ * e + geom_point(position="jitter) - add random noise to X and Y position of each element to avoid overplotting
+ 
+ * scale_y_log10() - plot y on log10
+ 
+```{r }
+ggplot(data=filtered_data, aes(x=as.factor(zipCode), y=income)) + 
+  geom_point(aes(x = as.factor(zipCode)), position = "jitter", alpha = 0.2) +
+  scale_y_log10()
+```
+
+Create a new ggplot by adding a box plot layer to your previous graph.  To do this, add the ggplot function geom_boxplot().  Also, add color to the scatter plot so that data points between different zip codes are different colors.  Be sure to label the axes and add a title to the graph.
+
+```{r }
+ggplot(data=filtered_data, 
+       aes(x=as.factor(zipCode), y=income)) + 
+        geom_point(aes(color = as.factor(zipCode)), position = "jitter", alpha = 0.2) +
+        scale_y_log10() +
+        geom_boxplot(alpha = 0.1, outlier.size = -Inf) +
+        labs(color="Region", x="Zip Code", y="Income", title="Average Income by Zip Code")
+```
